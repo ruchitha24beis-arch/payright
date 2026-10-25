@@ -5,14 +5,16 @@ echo ========================================================
 echo Staging and Committing all updates...
 echo ========================================================
 git add .
-git commit -m "fix(backend): add greenlet and asyncpg to requirements.txt for SQLAlchemy asyncio support"
+set /p commit_msg="Enter commit message (or press Enter for default): "
+if "%commit_msg%"=="" set commit_msg="update: sync project changes and deployment configurations"
+git commit -m "%commit_msg%"
 
 echo.
 echo ========================================================
 echo Pushing Chanakya to https://github.com/ruchitha24beis-arch/payright.git
 echo ========================================================
 echo.
-git push -u origin main
+git push origin main
 if %errorlevel% equ 0 (
     echo.
     echo ========================================================
@@ -24,7 +26,7 @@ if %errorlevel% equ 0 (
     echo ========================================================
     echo PUSH FAILED:
     echo Please make sure you are signed into GitHub in your browser,
-    echo or enter your GitHub credentials/token when prompted.
+    echo or check your network connection.
     echo ========================================================
 )
 echo.
