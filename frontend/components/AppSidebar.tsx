@@ -11,8 +11,11 @@ import {
   Send, 
   Home, 
   ExternalLink, 
-  X,
-  CheckCircle2
+  Building2,
+  Scale,
+  LogOut,
+  Users,
+  X
 } from "lucide-react";
 
 interface AppSidebarProps {
@@ -26,10 +29,12 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/invoices/health-check", label: "Document Health", icon: FileCheck2 },
+    { href: "/buyers", label: "Corporate Financials", icon: Building2 },
     { href: "/settlement-builder", label: "Settlement & EMI", icon: Handshake },
     { href: "/treds", label: "TReDS Financing", icon: Coins },
     { href: "/credit-safeguards", label: "Credit Limits", icon: ShieldAlert },
-    { href: "/reminders", label: "Reminders", icon: Send },
+    { href: "/reminders", label: "Reminders & Portal", icon: Send },
+    { href: "/samadhan", label: "MSME Samadhan Hub", icon: Scale },
   ];
 
   return (
@@ -119,15 +124,38 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
               </Link>
 
               <Link
+                href="/buyer/dashboard"
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium transition-colors mt-0.5 ${
+                  pathname?.startsWith("/buyer")
+                    ? "bg-[#0F172A] text-white font-semibold shadow-xs"
+                    : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  <span>Buyer AP Portal</span>
+                </div>
+                <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold">AP Desk</span>
+              </Link>
+
+              <Link
                 href="/portal/745ddfcf7a0642419b2dcee2b13b9f56"
                 target="_blank"
                 className="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors mt-0.5"
               >
                 <div className="flex items-center gap-3">
                   <ExternalLink className="w-4 h-4 text-amber-600" />
-                  <span>Buyer Portal</span>
+                  <span>Guest Portal</span>
                 </div>
                 <span className="text-[10px] text-slate-400">Live</span>
+              </Link>
+
+              <Link
+                href="/login"
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors mt-0.5"
+              >
+                <Users className="w-4 h-4 text-slate-500" />
+                <span>Switch Role (Login)</span>
               </Link>
             </div>
           </div>

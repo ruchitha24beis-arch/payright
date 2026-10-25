@@ -13,6 +13,16 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isGuestPortal = pathname?.startsWith("/portal");
+  const isAuth = pathname?.startsWith("/login");
+
+  // Full screen auth pages (login / supplier / buyer)
+  if (isAuth) {
+    return (
+      <div className="min-h-screen bg-[#0F172A] text-slate-100 flex flex-col justify-center">
+        {children}
+      </div>
+    );
+  }
 
   // Whitelabel Corporate Buyer Guest Portal Layout
   if (isGuestPortal) {

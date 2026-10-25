@@ -11,6 +11,10 @@ class CompanyBase(BaseModel):
     enterprise_class: str = "MICRO"
     major_activity: str = "MANUFACTURING"
     credit_limit: float = 1000000.0
+    annual_turnover: Optional[float] = None
+    net_profit_margin: Optional[float] = None
+    mca_filing_status: str = "ACTIVE_COMPLIANT"
+    total_outstandings: Optional[float] = 0.0
     is_tax_loss: bool = False
     contact_person: Optional[str] = None
     email: str

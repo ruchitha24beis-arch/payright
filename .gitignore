@@ -28,3 +28,7 @@ yarn-debug.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Generated uploads
+backend/uploads/**/*.pdf
+backend/uploads/*.pdf

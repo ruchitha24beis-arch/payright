@@ -10,7 +10,7 @@ from app.database import engine, Base, AsyncSessionLocal
 from app.models.company import Company
 from app.seed_data import seed_database
 from app.tasks import process_deemed_acceptance_locks
-from app.routers import invoices, settlements, guest_portal, treds, financing, vendors, reminders, safeguards, analytics, sync, auth
+from app.routers import invoices, settlements, guest_portal, treds, financing, vendors, reminders, safeguards, analytics, sync, auth, samadhan
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,6 +65,10 @@ app.include_router(safeguards.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sync.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(samadhan.router, prefix=settings.API_V1_PREFIX)
+
+# Tokenized Guest Portal verification alias
+app.add_api_route("/api/v1/portal/verify/{token}", guest_portal.verify_guest_token, methods=["GET"], tags=["Whitelabel Corporate Buyer Portal"])
 
 @app.get("/")
 async def root():

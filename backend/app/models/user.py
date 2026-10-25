@@ -9,6 +9,8 @@ class UserRole(str, enum.Enum):
     FINANCE_HEAD = "FINANCE_HEAD"
     ACCOUNTS_RECEIVABLE = "ACCOUNTS_RECEIVABLE"
     BUYER_ACCOUNTANT = "BUYER_ACCOUNTANT"
+    SUPPLIER = "SUPPLIER"
+    BUYER = "BUYER"
 
 class User(Base):
     __tablename__ = "users"

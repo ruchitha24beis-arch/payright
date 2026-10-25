@@ -38,6 +38,9 @@ class Company(Base):
     major_activity = Column(Enum(MajorActivity), default=MajorActivity.MANUFACTURING, nullable=False)
     
     credit_limit = Column(Float, default=1000000.0)  # INR
+    annual_turnover = Column(Float, nullable=True)   # In ₹ Crores
+    net_profit_margin = Column(Float, nullable=True) # Percentage (%)
+    mca_filing_status = Column(String(50), default="ACTIVE_COMPLIANT", nullable=False) # ACTIVE_COMPLIANT | TAX_LOSS_EXEMPT
     is_tax_loss = Column(Boolean, default=False, nullable=False)  # Net tax loss status (disables 43B(h) and triggers Sec 16)
     
     contact_person = Column(String(100), nullable=True)

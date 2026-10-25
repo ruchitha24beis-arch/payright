@@ -59,6 +59,8 @@ interface AuthContextType {
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
   login: (email: string, password: string) => Promise<boolean>;
+  loginSupplier: (email: string, password: string) => Promise<boolean>;
+  loginBuyer: (email: string, password: string) => Promise<boolean>;
   register: (payload: RegisterPayload) => Promise<boolean>;
   logout: () => void;
   updateCompany: (data: Partial<CompanyProfile>) => Promise<boolean>;
@@ -130,6 +132,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginSupplier = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/supplier/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        if (data.company) setCompany(data.company);
+        if (data.token) {
+          setToken(data.token);
+          localStorage.setItem("chanakya_token", data.token);
+          localStorage.setItem("chanakya_role", "SUPPLIER");
+          if (typeof document !== "undefined") {
+            document.cookie = `chanakya_token=${data.token}; path=/; max-age=604800`;
+            document.cookie = `chanakya_role=SUPPLIER; path=/; max-age=604800`;
+          }
+        }
+        setAuthModalOpen(false);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Supplier login failed:", err);
+      return false;
+    }
+  };
+
+  const loginBuyer = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/buyer/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        if (data.company) setCompany(data.company);
+        if (data.token) {
+          setToken(data.token);
+          localStorage.setItem("chanakya_token", data.token);
+          localStorage.setItem("chanakya_role", "BUYER");
+          if (typeof document !== "undefined") {
+            document.cookie = `chanakya_token=${data.token}; path=/; max-age=604800`;
+            document.cookie = `chanakya_role=BUYER; path=/; max-age=604800`;
+          }
+        }
+        setAuthModalOpen(false);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Buyer login failed:", err);
+      return false;
+    }
+  };
+
   const register = async (payload: RegisterPayload): Promise<boolean> => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
@@ -160,6 +222,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCompany(null);
     setToken(null);
     localStorage.removeItem("chanakya_token");
+    localStorage.removeItem("chanakya_role");
+    if (typeof document !== "undefined") {
+      document.cookie = "chanakya_token=; path=/; max-age=0";
+      document.cookie = "chanakya_role=; path=/; max-age=0";
+    }
     setAuthModalOpen(true);
   };
 
@@ -236,6 +303,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authModalOpen,
         setAuthModalOpen,
         login,
+        loginSupplier,
+        loginBuyer,
         register,
         logout,
         updateCompany,

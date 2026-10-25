@@ -17,7 +17,8 @@ import {
   Lock,
   Layers,
   Zap,
-  Info
+  Info,
+  Check
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 
@@ -214,6 +215,214 @@ function PortalContent() {
         <p className="text-xs text-[#64748B]">
           Please contact the vendor accounts receivable desk for an updated corporate reconciliation link.
         </p>
+      </div>
+    );
+  }
+
+  if ((portalData as any).is_aggregated) {
+    const agg = portalData as any;
+    const metrics = agg.aggregated_metrics || {};
+    const buyer = agg.buyer || {};
+    const vendor = agg.vendor || {};
+    const prompt = agg.prompt_settlement_offer || {};
+    const itemInvoices: any[] = agg.invoices || [];
+
+    return (
+      <div className="space-y-6">
+        {/* Aggregated Header Banner */}
+        <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
+                  Corporate Account Settlement Link
+                </span>
+                <span className="text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Section 43B(h) Active
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                {buyer.name || "Corporate Treasury AP Desk"}
+              </h1>
+              <p className="text-xs text-slate-400 mt-1">
+                Settling payables to <span className="font-semibold text-slate-200">{vendor.name || "Apex Precision"}</span> (Udyam: <span className="font-mono text-slate-200">{vendor.udyam_number || "UDYAM-MH-01-0012345"}</span>)
+              </p>
+            </div>
+
+            <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700/80 text-right">
+              <div className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                Total Aggregated Balance
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+                {formatINR(metrics.balance_due || 0)}
+              </div>
+              <div className="text-[11px] text-emerald-400 mt-0.5 font-medium">
+                {itemInvoices.length} invoices bundled
+              </div>
+            </div>
+          </div>
+
+          {/* Aggregated KPI Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-800">
+            <div>
+              <div className="text-[11px] text-slate-400 font-medium">Consolidated Principal</div>
+              <div className="text-lg font-bold text-white mt-0.5">{formatINR(metrics.total_principal || 0)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-400 font-medium">Prompt Payment Discount (2.5%)</div>
+              <div className="text-lg font-bold text-emerald-400 mt-0.5">{formatINR(prompt.instant_savings || 0)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-400 font-medium">Section 16 Penal Interest</div>
+              <div className="text-lg font-bold text-rose-400 mt-0.5">{formatINR(metrics.combined_sec16_interest || 0)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-400 font-medium">Sec 43B(h) Corporate Tax Risk</div>
+              <div className="text-lg font-bold text-amber-400 mt-0.5">{formatINR(metrics.sec43bh_tax_exposure || 0)}</div>
+            </div>
+          </div>
+        </div>
+
+        {actionSuccess && (
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center gap-2 text-xs font-semibold shadow-xs">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{actionSuccess}</span>
+          </div>
+        )}
+
+        {/* Itemized Invoices Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-sm text-slate-900">
+                Itemized Invoice Breakdown ({itemInvoices.length} Invoices)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Governed under 15-day deemed acceptance locks and statutory MSMED Act Section 15
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3 px-4">Invoice No</th>
+                  <th className="py-3 px-4">PO Number</th>
+                  <th className="py-3 px-4 text-right">Principal</th>
+                  <th className="py-3 px-4 text-right">Balance Due</th>
+                  <th className="py-3 px-4">Due Date</th>
+                  <th className="py-3 px-4">Acceptance Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {itemInvoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-900">
+                      {inv.invoice_number}
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 font-mono">
+                      {inv.po_number || "PO-DIRECT"}
+                    </td>
+                    <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                      {formatINR(inv.principal_amount)}
+                    </td>
+                    <td className="py-3 px-4 text-right font-bold text-slate-900">
+                      {formatINR(inv.balance_due)}
+                    </td>
+                    <td className="py-3 px-4 text-slate-600">
+                      {inv.due_date}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        <Lock className="w-3 h-3 text-emerald-600" />
+                        {inv.lock_status || "Contractually Locked"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Corporate AP Action Center */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Action 1: Prompt Settlement Discount Card */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Instant Prompt Settlement Offer (2.5% Savings)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Pay {formatINR(prompt.net_payable_amount || (metrics.balance_due * 0.975))} today and save {formatINR(prompt.instant_savings || (metrics.balance_due * 0.025))}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              By confirming payment within the statutory discount window, the buyer saves finance charges and immediately wipes off 100% of Section 43B(h) disallowance risk on taxable profits.
+            </p>
+
+            <button
+              onClick={() => handleAction("ACCEPT_PROMPT_DISCOUNT")}
+              disabled={processing}
+              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              <span>{processing ? "Processing..." : "Claim 2.5% Discount & Confirm Full Settlement"}</span>
+            </button>
+          </div>
+
+          {/* Action 2: UTR Submission Form */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                <FileCheck2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Reconcile via RTGS / NEFT UTR Reference
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Submit bank transaction reference to instantly reconcile all {itemInvoices.length} invoices
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Bank UTR / Transaction Reference (12-22 Alphanumeric)
+              </label>
+              <input
+                type="text"
+                value={utrNumber}
+                onChange={(e) => setUtrNumber(e.target.value)}
+                placeholder="e.g. HDFCR52024102600123"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+              />
+              {showUtrError && (
+                <p className="text-[11px] text-rose-600 mt-1 font-medium">
+                  Please enter a valid 12-22 character bank UTR number.
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={() => handleAction("SUBMIT_PAYMENT")}
+              disabled={processing}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-semibold text-xs transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>{processing ? "Submitting UTR..." : "Submit Consolidated Bank Payment UTR"}</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

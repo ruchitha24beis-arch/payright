@@ -1,14 +1,20 @@
 import asyncio
+import hashlib
 from datetime import date, datetime, timedelta
 from app.database import AsyncSessionLocal, engine, Base
 from app.models.company import Company, CompanyRole, EnterpriseCategory, EnterpriseClass, MajorActivity
+from app.models.user import User, UserRole
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.emi import EMIPlan, EMISchedule, EMIPlanStatus, EMIScheduleStatus, ENACHMandateStatus
 from app.models.order import LinkedOrder, ReleaseRule, OrderStatus
+from app.models.portal_session import AggregatedPortalToken
 from app.engines.ocr_inspector import DocumentHealthInspector
 from app.engines.invoice_lock_engine import InvoiceLockEngine
 from app.engines.enach_mandate import ENACHMandateEngine
 from app.engines.udyam_verifier import UdyamVerifier
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256((password + "chanakya_salt_2026").encode()).hexdigest()
 
 async def seed_database():
     async with engine.begin() as conn:
@@ -29,6 +35,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.MICRO,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=5000000.0,
+                annual_turnover=18.5,
+                net_profit_margin=12.2,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Rajesh Sharma (Managing Director)",
                 email="accounts@apexprecision.in",
@@ -46,6 +55,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.SMALL,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=7500000.0,
+                annual_turnover=32.0,
+                net_profit_margin=9.5,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Vikram Patil (Partner)",
                 email="billing@sahyadrifasteners.com",
@@ -63,6 +75,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.MICRO,
                 major_activity=MajorActivity.SERVICES,
                 credit_limit=3000000.0,
+                annual_turnover=8.5,
+                net_profit_margin=14.0,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Sunita Rao (Proprietor)",
                 email="finance@kaveripolymers.in",
@@ -80,6 +95,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.SMALL,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=4500000.0,
+                annual_turnover=14.0,
+                net_profit_margin=10.2,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Bhavesh Mehta (Operations Head)",
                 email="accounts@zenithtooling.co.in",
@@ -98,6 +116,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.SMALL,
                 major_activity=MajorActivity.TRADING,  # TRADER!
                 credit_limit=6000000.0,
+                annual_turnover=22.0,
+                net_profit_margin=5.1,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Anil Aggarwal (Director)",
                 email="cfo@apexhardwaretraders.com",
@@ -119,6 +140,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.MEDIUM,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=3500000.0,  # 35L Limit
+                annual_turnover=43500.0, # ₹43,500 Crores
+                net_profit_margin=8.4,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,       # Normal profitable corporate
                 contact_person="Nitin Kulkarni (Head of Procurement)",
                 email="procurement.vendorpay@tatamotors.com",
@@ -135,6 +159,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.MEDIUM,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=2500000.0,  # 25L Limit
+                annual_turnover=8400.0,  # ₹8,400 Crores
+                net_profit_margin=-3.2,
+                mca_filing_status="TAX_LOSS_EXEMPT",
                 is_tax_loss=True,        # TAX LOSS! Disables 43B(h) and triggers Sec 16 interest warnings
                 contact_person="Priya Deshmukh (Accounts Payable)",
                 email="ap.inward@bharatinfraeng.com",
@@ -150,6 +177,9 @@ async def seed_database():
                 enterprise_class=EnterpriseClass.MEDIUM,
                 major_activity=MajorActivity.MANUFACTURING,
                 credit_limit=4000000.0,  # 40L Limit
+                annual_turnover=14200.0, # ₹14,200 Crores
+                net_profit_margin=11.5,
+                mca_filing_status="ACTIVE_COMPLIANT",
                 is_tax_loss=False,
                 contact_person="Arun Nambiar (Corporate Treasury)",
                 email="treasury.payables@larsenauto.com",
@@ -548,8 +578,72 @@ async def seed_database():
         rail2_inv.status = InvoiceStatus.DISCOUNTED_TREDS
         rail2_inv.paid_amount = round(rail2_inv.principal_amount * 0.98, 2)
 
+        # 5. Seed Core Personas (Separate Supplier vs Buyer User Accounts)
+        users = [
+            # Supplier Personas
+            User(
+                name="Rajesh Sharma (MD)",
+                email="rajesh@apexprecision.in",
+                password_hash=hash_password("admin123"),
+                role=UserRole.SUPPLIER,
+                company_id=msmes[0].id
+            ),
+            User(
+                name="Apex Accounts Receivable",
+                email="accounts@apexprecision.in",
+                password_hash=hash_password("admin123"),
+                role=UserRole.SUPPLIER,
+                company_id=msmes[0].id
+            ),
+            User(
+                name="Vikram Patil (Partner)",
+                email="billing@sahyadrifasteners.com",
+                password_hash=hash_password("admin123"),
+                role=UserRole.SUPPLIER,
+                company_id=msmes[1].id
+            ),
+            # Buyer Personas (Corporate Accounts Payable & Treasury)
+            User(
+                name="Nitin Kulkarni (Head of Procurement)",
+                email="procurement@tatamotors.com",
+                password_hash=hash_password("buyer123"),
+                role=UserRole.BUYER,
+                company_id=buyers[0].id
+            ),
+            User(
+                name="Arun Nambiar (Corporate Treasury)",
+                email="treasury@larsenauto.com",
+                password_hash=hash_password("buyer123"),
+                role=UserRole.BUYER,
+                company_id=buyers[2].id
+            ),
+            User(
+                name="Priya Deshmukh (AP Inward)",
+                email="ap.inward@bharatinfraeng.com",
+                password_hash=hash_password("buyer123"),
+                role=UserRole.BUYER,
+                company_id=buyers[1].id
+            )
+        ]
+        db.add_all(users)
+
+        # 6. Seed Sample Multi-Invoice Aggregated Guest Portal Session for Tata Motors
+        tata_selected_invoices = [created_invoices[0].id, created_invoices[1].id]
+        tata_tot_principal = created_invoices[0].principal_amount + created_invoices[1].principal_amount
+        sample_portal = AggregatedPortalToken(
+            token="demo_tata_consolidated_2026",
+            buyer_id=buyers[0].id,
+            vendor_id=msmes[0].id,
+            invoice_ids=tata_selected_invoices,
+            total_principal=tata_tot_principal,
+            sec16_interest=78450.0,
+            sec43bh_exposure=tata_tot_principal * 0.30,
+            notes="Consolidated Q3 Commercial Supply Settlement Advisory"
+        )
+        db.add(sample_portal)
+
         await db.commit()
-        print("Database seeded with 5 MSMEs (including 1 Trader), 3 Corporate Buyers (including 1 Tax Loss), 10 Invoices (with Deemed Acceptance locks), and 2 Active e-NACH EMI Plans.")
+        print("Database seeded with 5 MSMEs, 3 Corporate Buyers, Users (Supplier/Buyer), Invoices, and Aggregated Portal Sessions.")
 
 if __name__ == "__main__":
     asyncio.run(seed_database())
