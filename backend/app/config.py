@@ -10,8 +10,8 @@ class Settings:
     
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "uploads")
     CORPORATE_TAX_RATE: float = 0.30
-    RBI_BANK_RATE: float = 0.0675  # 6.75%
-    MSMED_INTEREST_MULTIPLIER: float = 3.0 # 3x RBI rate (~20.25% p.a.)
+    RBI_BANK_RATE: float = 0.0575  # 5.75% (3x multiplier = 17.25% p.a. under Sec 16)
+    MSMED_INTEREST_MULTIPLIER: float = 3.0 # 3x RBI rate (17.25% p.a.)
 
 settings = Settings()
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

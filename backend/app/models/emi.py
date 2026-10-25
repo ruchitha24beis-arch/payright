@@ -16,6 +16,12 @@ class EMIScheduleStatus(str, enum.Enum):
     PAID = "PAID"
     OVERDUE = "OVERDUE"
 
+class ENACHMandateStatus(str, enum.Enum):
+    NOT_REGISTERED = "NOT_REGISTERED"
+    REGISTERED = "REGISTERED"
+    ACTIVE = "ACTIVE"
+    BOUNCED = "BOUNCED"
+
 class EMIPlan(Base):
     __tablename__ = "emi_plans"
 
@@ -33,6 +39,16 @@ class EMIPlan(Base):
 
     status = Column(Enum(EMIPlanStatus), default=EMIPlanStatus.OFFERED, nullable=False)
     notes = Column(String(500), nullable=True)
+    
+    # e-NACH Auto-Debit Mandate (Under Sec 25 Payment and Settlement Systems Act)
+    enach_mandate_status = Column(Enum(ENACHMandateStatus), default=ENACHMandateStatus.NOT_REGISTERED, nullable=False)
+    umrn = Column(String(50), nullable=True, index=True)  # Unique Mandate Reference Number
+    mandate_auth_url = Column(String(500), nullable=True)
+    mandate_bank_name = Column(String(100), nullable=True)
+    mandate_account_last4 = Column(String(10), nullable=True)
+    sec25_liability_acknowledged = Column(Boolean, default=False)
+    mandate_authorized_at = Column(DateTime, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -52,6 +68,10 @@ class EMISchedule(Base):
     status = Column(Enum(EMIScheduleStatus), default=EMIScheduleStatus.PENDING, nullable=False)
     paid_date = Column(Date, nullable=True)
     payment_reference = Column(String(100), nullable=True)
+    
+    # e-NACH debit execution status
+    enach_execution_status = Column(String(50), default="PENDING", nullable=False)  # PENDING, SUCCESS, BOUNCED
+    failure_reason = Column(String(255), nullable=True)
     
     # Milestone release units unlocked upon payment of this installment
     units_to_release = Column(Integer, default=0)

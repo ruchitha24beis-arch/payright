@@ -12,8 +12,11 @@ import {
   Layers,
   Banknote,
   Info,
-  Check
+  Check,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 interface InvoiceItem {
   id: number;
@@ -23,6 +26,9 @@ interface InvoiceItem {
   principal_amount: number;
   status: string;
   document_health_score: number;
+  financing_rail?: string;
+  financing_status?: string;
+  financing_details?: any;
 }
 
 interface FinancierBid {
@@ -47,10 +53,14 @@ interface BidResult {
   bids: FinancierBid[];
 }
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function TReDSFactoringPage() {
+  const { company } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
   const [selectedExchange, setSelectedExchange] = useState<string>("RXIL");
+  const [preferredRail, setPreferredRail] = useState<string>("AUTO");
   const [bidData, setBidData] = useState<BidResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchingBids, setFetchingBids] = useState(false);
@@ -58,24 +68,31 @@ export default function TReDSFactoringPage() {
   const [successResult, setSuccessResult] = useState<any | null>(null);
 
   useEffect(() => {
-    async function loadInvoices() {
-      try {
-        const res = await fetch("http://localhost:8000/api/v1/invoices");
-        if (res.ok) {
-          const data = await res.json();
-          setInvoices(data);
-          if (data.length > 0) {
-            setSelectedInvoiceId(data[0].id);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadInvoices();
-  }, []);
+  }, [company?.id]);
+
+  async function loadInvoices() {
+    try {
+      const vendorParam = company?.id ? `?vendor_id=${company.id}` : "";
+      const res = await fetch(`${API_BASE_URL}/api/v1/invoices${vendorParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setInvoices(data);
+        if (data.length > 0) {
+          setSelectedInvoiceId(data[0].id);
+        } else {
+          setSelectedInvoiceId(null);
+          setBidData(null);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const selectedInvoice = invoices.find(i => i.id === selectedInvoiceId);
 
   const handleFetchBids = async () => {
     if (!selectedInvoiceId) return;
@@ -83,7 +100,7 @@ export default function TReDSFactoringPage() {
     setSuccessResult(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/treds/bids", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/treds/bids`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -103,28 +120,55 @@ export default function TReDSFactoringPage() {
     }
   };
 
-  const handleExecuteDiscount = async () => {
+  const handleExecuteDualRail = async () => {
     if (!selectedInvoiceId) return;
     setExecuting(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/treds/discount-request", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/financing/dual-rail-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invoice_id: selectedInvoiceId,
-          exchange_code: selectedExchange,
-          selected_rate: bidData?.annual_discount_rate_percent || 8.1
+          preferred_rail: preferredRail
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        setSuccessResult(data);
-        const invRes = await fetch("http://localhost:8000/api/v1/invoices");
-        if (invRes.ok) {
-          setInvoices(await invRes.json());
-        }
+        setSuccessResult({
+          message: data.safeguard_explanation,
+          net_disbursal: data.net_immediate_disbursal,
+          active_rail: data.active_rail,
+          rate: data.applied_discount_rate_pa,
+          request_id: data.request_id
+        });
+        await loadInvoices();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const handleForceFailover = async () => {
+    if (!selectedInvoiceId) return;
+    setExecuting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/financing/force-failover/${selectedInvoiceId}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessResult({
+          message: data.message,
+          net_disbursal: data.net_disbursal_amount,
+          active_rail: data.active_rail,
+          rate: 10.8,
+          request_id: "NBFC-FAILOVER-CLEARANCE"
+        });
+        await loadInvoices();
       }
     } catch (err) {
       console.error(err);
@@ -145,7 +189,7 @@ export default function TReDSFactoringPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
         <div className="w-8 h-8 rounded-full border-2 border-[#163A5F] border-t-transparent animate-spin" />
-        <p className="text-xs font-medium text-[#64748B]">Connecting to RBI TReDS exchange gateways...</p>
+        <p className="text-xs font-medium text-[#64748B]">Connecting to Dual-Rail Financing (TReDS &amp; NBFC gateways)...</p>
       </div>
     );
   }
@@ -153,55 +197,53 @@ export default function TReDSFactoringPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#E2E8F0]">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-[#0F172A]">
-              Silent TReDS Bill Discounting Bridge
+            <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+              TReDS Invoice Financing
             </h1>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200">
-              RBI Approved Exchanges
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              Dual-Rail Active
             </span>
           </div>
           <p className="text-xs text-[#64748B] mt-0.5">
-            Discount verified corporate receivables Institutional-Side at ~8% p.a. without buyer tension. Receive working capital in 24 hours with zero recourse.
+            Instant non-recourse bill discounting at ~8% p.a. with automated NBFC failover protection.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-[#64748B] bg-[#F8FAFC] px-3 py-2 rounded-lg border border-[#E2E8F0]">
-          <ShieldCheck className="w-4 h-4 text-[#16A34A]" />
-          <span>Non-Recourse Factoring &bull; Zero Buyer Conflict</span>
         </div>
       </div>
 
+      {/* Success Notification */}
       {successResult && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 shadow-xs space-y-1.5">
-          <div className="flex items-center gap-2 text-[#16A34A] font-bold text-xs">
-            <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />
-            <span>Silent TReDS Bill Factoring Executed Successfully</span>
+        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 shadow-2xs space-y-1">
+          <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Financing Active ({successResult.active_rail})</span>
           </div>
           <p className="text-xs text-slate-700">
-            {successResult.commercial_preservation_benefit}
+            {successResult.message}
           </p>
-          <div className="text-[11px] font-mono text-emerald-800 font-semibold pt-1">
-            Transaction UTR: {successResult.transaction_reference} &bull; Net Disbursal: {formatINR(successResult.net_credited_amount)}
+          <div className="text-[11px] font-mono text-emerald-800 font-semibold">
+            Net Disbursal: {formatINR(successResult.net_disbursal)} · Rate: {successResult.rate}% p.a.
           </div>
         </div>
       )}
 
-      {/* Grid: Exchange Selector & Bids */}
+      {/* Dual-Rail Engine Configuration Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Col: Setup & Exchange Selector */}
-        <div className="lg:col-span-5 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4">
-          <h2 className="font-bold text-sm text-[#0F172A] flex items-center gap-2">
-            <Coins className="w-4 h-4 text-purple-700" />
-            <span>Select Invoice &amp; Exchange</span>
-          </h2>
+        {/* Left Config Card (6 cols) */}
+        <div className="lg:col-span-6 rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b pb-2.5 border-[#E2E8F0]">
+            <h2 className="font-bold text-xs text-[#0F172A] uppercase tracking-wider flex items-center gap-2">
+              <Layers className="w-4 h-4 text-blue-600" />
+              <span>Select Invoice &amp; Routing</span>
+            </h2>
+          </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             <div>
               <label className="text-xs font-semibold text-[#0F172A] block mb-1">
-                Select Invoice to Factor
+                Select Invoice
               </label>
               <select
                 value={selectedInvoiceId || ""}
@@ -209,19 +251,54 @@ export default function TReDSFactoringPage() {
                   setSelectedInvoiceId(Number(e.target.value));
                   setBidData(null);
                 }}
-                className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] focus:outline-hidden focus:border-[#2563EB] focus:bg-white transition"
+                className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] focus:outline-hidden focus:border-blue-600 font-medium"
               >
                 {invoices.map((inv) => (
                   <option key={inv.id} value={inv.id}>
-                    {inv.invoice_number} &bull; {inv.buyer_name} &bull; {formatINR(inv.principal_amount)}
+                    {inv.invoice_number} · {inv.buyer_name} · {formatINR(inv.principal_amount)} ({inv.financing_rail || "NONE"})
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Routing Mode */}
             <div>
               <label className="text-xs font-semibold text-[#0F172A] block mb-1">
-                TReDS Exchange Platform
+                Financing Routing Mode
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreferredRail("AUTO")}
+                  className={`p-3 rounded-lg border text-left text-xs transition cursor-pointer ${
+                    preferredRail === "AUTO"
+                      ? "border-blue-600 bg-blue-50/50 shadow-xs"
+                      : "border-[#E2E8F0] hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold text-blue-900">Rail 1 (TReDS Auto)</div>
+                  <div className="text-[10px] text-blue-700 mt-0.5">~8.1% p.a. · 7-day buyer window</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreferredRail("RAIL_2_NBFC")}
+                  className={`p-3 rounded-lg border text-left text-xs transition cursor-pointer ${
+                    preferredRail === "RAIL_2_NBFC"
+                      ? "border-emerald-600 bg-emerald-50/50 shadow-xs"
+                      : "border-[#E2E8F0] hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold text-emerald-900">Direct Rail 2 (NBFC)</div>
+                  <div className="text-[10px] text-emerald-700 mt-0.5">~10.8% p.a. · Instant on verified POD</div>
+                </button>
+              </div>
+            </div>
+
+            {/* TReDS Exchange Selector */}
+            <div>
+              <label className="text-xs font-semibold text-[#0F172A] block mb-1">
+                Exchange Platform
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -236,124 +313,123 @@ export default function TReDSFactoringPage() {
                       setSelectedExchange(exch.code);
                       setBidData(null);
                     }}
-                    className={`p-3 rounded-lg border text-left transition ${
+                    className={`p-2.5 rounded-lg border text-left transition cursor-pointer ${
                       selectedExchange === exch.code
-                        ? "bg-purple-50 border-purple-300 text-purple-950 font-semibold"
-                        : "bg-[#F8FAFC] border-[#E2E8F0] text-slate-700 hover:bg-slate-100"
+                        ? "border-[#0F172A] bg-slate-50 text-[#0F172A] font-bold"
+                        : "border-[#E2E8F0] hover:bg-slate-50 text-[#0F172A]"
                     }`}
                   >
-                    <div className="font-bold text-xs">{exch.name}</div>
-                    <div className="text-[10px] text-purple-700 font-mono mt-0.5">{exch.rate} avg</div>
+                    <div className="text-xs">{exch.name}</div>
+                    <div className="text-[10px] text-[#64748B]">{exch.rate} avg</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <button
-              onClick={handleFetchBids}
-              disabled={fetchingBids}
-              className="w-full py-2.5 rounded-lg bg-[#163A5F] hover:bg-[#102B47] font-semibold text-xs text-white shadow-xs transition disabled:opacity-50"
-            >
-              {fetchingBids ? "Polling Exchange Orderbook..." : "Request Institutional Bids"}
-            </button>
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={handleExecuteDualRail}
+                disabled={executing}
+                className="flex-1 py-2.5 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-xs shadow-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                {executing ? "Processing..." : "Initiate Dual-Rail Financing"}
+              </button>
 
-            <div className="p-3.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#64748B] space-y-1">
-              <span className="font-bold text-[#0F172A] flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>Why Silent TReDS Factoring?</span>
-              </span>
-              <p className="leading-relaxed">
-                Because the buyer is an approved corporate with verified credit, institutional financiers bid to buy the accepted bill directly. You receive immediate cash in 24 hours without any awkward collection calls.
-              </p>
+              <button
+                type="button"
+                onClick={handleFetchBids}
+                disabled={fetchingBids}
+                className="px-4 py-2.5 rounded-lg bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 font-bold text-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                {fetchingBids ? "..." : "Fetch Bids"}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Right Col: Bids Breakdown */}
-        <div className="lg:col-span-7">
-          {bidData ? (
-            <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-5">
-              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+        {/* Right Status & Failover Inspection (6 cols) */}
+        <div className="lg:col-span-6 space-y-4">
+          <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-3.5">
+            <div className="flex items-center justify-between border-b pb-2.5 border-[#E2E8F0]">
+              <span className="text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+                Financing Status
+              </span>
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800">
+                {selectedInvoice?.financing_rail || "NONE"}
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] flex justify-between items-center">
                 <div>
-                  <span className="text-[10px] font-mono text-purple-700 uppercase font-bold tracking-wider">
-                    Bid Reference: {bidData.bid_id}
-                  </span>
-                  <h2 className="font-bold text-[#0F172A] text-base mt-0.5">{bidData.exchange}</h2>
+                  <span className="text-[#64748B] block text-[11px]">Active Rail</span>
+                  <span className="font-bold text-[#0F172A] text-sm">{selectedInvoice?.financing_rail || "NONE"}</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs text-[#64748B]">Institutional Rate</span>
-                  <div className="text-lg font-black text-[#16A34A] tabular-nums">
-                    {bidData.annual_discount_rate_percent}% p.a.
+                <div>
+                  <span className="text-[#64748B] block text-[11px]">POD Legal Score</span>
+                  <span className="font-bold text-emerald-700 text-sm">{selectedInvoice?.document_health_score}%</span>
+                </div>
+              </div>
+
+              {selectedInvoice?.financing_rail === "RAIL_1_TREDS" && (
+                <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/70 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>7-Day Buyer Approval Window</span>
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
+                      Active
+                    </span>
                   </div>
+                  <p className="text-[11px] text-amber-800">
+                    If buyer does not approve on TReDS within 7 days, system auto-fails over to Private NBFC Anchor Financing.
+                  </p>
+                  <button
+                    onClick={handleForceFailover}
+                    disabled={executing}
+                    className="w-full py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs transition cursor-pointer"
+                  >
+                    Force Failover to Rail 2 NBFC
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Financial Calculation Strip */}
-              <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-center">
-                <div>
-                  <span className="text-[10px] text-[#64748B] uppercase font-bold tracking-wider block">
-                    Face Value
+              {selectedInvoice?.financing_rail === "RAIL_2_NBFC" && (
+                <div className="p-3.5 rounded-xl border border-emerald-300 bg-emerald-50/70 space-y-1">
+                  <span className="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Rail 2 Private NBFC Disbursed</span>
                   </span>
-                  <span className="text-sm sm:text-base font-bold text-[#0F172A] mt-1 block tabular-nums">
-                    {formatINR(bidData.principal_amount)}
-                  </span>
+                  <p className="text-[11px] text-emerald-800">
+                    Funded institutional-side on verified POD documents with non-recourse assumption.
+                  </p>
                 </div>
-                <div>
-                  <span className="text-[10px] text-amber-800 uppercase font-bold tracking-wider block">
-                    Discount Charge (60D)
-                  </span>
-                  <span className="text-sm sm:text-base font-bold text-amber-800 mt-1 block tabular-nums">
-                    -{formatINR(bidData.discount_charge)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#16A34A] uppercase font-bold tracking-wider block">
-                    24-Hr Net Disbursal
-                  </span>
-                  <span className="text-sm sm:text-base font-bold text-[#16A34A] mt-1 block tabular-nums">
-                    {formatINR(bidData.net_immediate_disbursal)}
-                  </span>
-                </div>
-              </div>
+              )}
+            </div>
 
-              {/* Live Bank Bidders List */}
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider block">
-                  Live Institutional Bidders
+            {/* Simulated Bids Table */}
+            {bidData && (
+              <div className="pt-2 border-t border-[#E2E8F0] space-y-2">
+                <span className="text-xs font-bold text-[#0F172A] uppercase tracking-wider block">
+                  Financier Competitive Bids ({bidData.exchange})
                 </span>
-                {bidData.bids.map((b, i) => (
-                  <div key={i} className="p-3 rounded-lg border border-[#E2E8F0] bg-white flex items-center justify-between text-xs hover:bg-[#F8FAFC] transition">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="w-4 h-4 text-purple-700" />
-                      <span className="font-semibold text-[#0F172A]">{b.financier}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-[#0F172A] font-bold">{b.rate.toFixed(2)}% p.a.</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        {b.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
 
-              <button
-                onClick={handleExecuteDiscount}
-                disabled={executing}
-                className="w-full py-2.5 rounded-lg bg-[#163A5F] hover:bg-[#102B47] font-semibold text-xs text-white shadow-xs transition disabled:opacity-50"
-              >
-                {executing ? "Processing Exchange Settlement..." : "Accept Best Bid & Disburse Within 24 Hours"}
-              </button>
-            </div>
-          ) : (
-            <div className="p-10 rounded-xl border border-dashed border-[#E2E8F0] bg-white text-center space-y-2">
-              <Coins className="w-8 h-8 text-slate-300 mx-auto" />
-              <h2 className="font-semibold text-[#0F172A] text-xs">No Active Exchange Session</h2>
-              <p className="text-xs text-[#64748B] max-w-sm mx-auto">
-                Select an invoice on the left and click &apos;Request Institutional Bids&apos; to view quotes from RXIL, M1xchange, and Invoicemart.
-              </p>
-            </div>
-          )}
+                <div className="space-y-1.5">
+                  {bidData.bids.map((b, i) => (
+                    <div key={i} className="p-2.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-bold text-[#0F172A]">{b.financier}</span>
+                        <span className="text-[10px] text-emerald-700 block font-semibold">{b.status}</span>
+                      </div>
+                      <span className="font-mono font-bold text-blue-700 text-sm">{b.rate}% p.a.</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

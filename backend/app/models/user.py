@@ -20,3 +20,5 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.ACCOUNTS_RECEIVABLE)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    company = relationship("Company", backref="users")

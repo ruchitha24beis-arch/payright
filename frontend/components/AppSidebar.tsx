@@ -11,9 +11,8 @@ import {
   Send, 
   Home, 
   ExternalLink, 
-  ShieldCheck,
-  Building2,
-  X
+  X,
+  CheckCircle2
 } from "lucide-react";
 
 interface AppSidebarProps {
@@ -26,11 +25,11 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/invoices/health-check", label: "Doc Health Inspector", icon: FileCheck2 },
-    { href: "/settlement-builder", label: "Settlement & EMI Builder", icon: Handshake },
-    { href: "/treds", label: "Silent TReDS Factoring", icon: Coins },
-    { href: "/credit-safeguards", label: "Credit Safeguards", icon: ShieldAlert },
-    { href: "/reminders", label: "Diplomatic Reminders", icon: Send },
+    { href: "/invoices/health-check", label: "Document Health", icon: FileCheck2 },
+    { href: "/settlement-builder", label: "Settlement & EMI", icon: Handshake },
+    { href: "/treds", label: "TReDS Financing", icon: Coins },
+    { href: "/credit-safeguards", label: "Credit Limits", icon: ShieldAlert },
+    { href: "/reminders", label: "Reminders", icon: Send },
   ];
 
   return (
@@ -53,15 +52,15 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
           {/* Brand Logo & Name */}
           <div className="h-16 px-5 border-b border-[#E2E8F0] flex items-center justify-between bg-white">
             <Link href="/dashboard" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-xl bg-[#163A5F] flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:bg-[#102B47] transition">
+              <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center text-white font-bold text-base shadow-xs group-hover:bg-[#1E293B] transition">
                 C
               </div>
               <div>
-                <span className="font-bold text-[#163A5F] text-base tracking-tight block">
+                <span className="font-bold text-[#0F172A] text-base tracking-tight block">
                   Chanakya
                 </span>
-                <span className="text-[10px] text-[#64748B] block font-medium -mt-0.5">
-                  MSME Commercial Recovery
+                <span className="text-[10px] text-[#64748B] block font-medium">
+                  Receivables Overlay
                 </span>
               </div>
             </Link>
@@ -77,8 +76,8 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
 
           {/* Navigation Items */}
           <div className="p-3 space-y-1">
-            <div className="px-3 py-2 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-              Commercial Engine
+            <div className="px-3 pt-2 pb-1.5 text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              Navigation
             </div>
 
             {navLinks.map((link) => {
@@ -92,7 +91,7 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium transition-colors ${
                     isActive
-                      ? "bg-[#163A5F] text-white font-semibold shadow-xs"
+                      ? "bg-[#0F172A] text-white font-semibold shadow-xs"
                       : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
                   }`}
                 >
@@ -102,21 +101,21 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
               );
             })}
 
-            <div className="pt-3">
-              <div className="px-3 py-2 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-                Overview & Portal
+            <div className="pt-4">
+              <div className="px-3 pb-1.5 text-[10px] font-bold text-[#94A3B8] uppercase tracking-wider">
+                Portals &amp; Overview
               </div>
               <Link
                 href="/"
                 onClick={onClose}
                 className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium transition-colors ${
                   pathname === "/"
-                    ? "bg-[#163A5F] text-white font-semibold shadow-xs"
+                    ? "bg-[#0F172A] text-white font-semibold shadow-xs"
                     : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
                 }`}
               >
                 <Home className="w-4 h-4 text-[#64748B]" />
-                <span>Executive Overview</span>
+                <span>Overview</span>
               </Link>
 
               <Link
@@ -125,10 +124,10 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
                 className="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] transition-colors mt-0.5"
               >
                 <div className="flex items-center gap-3">
-                  <Building2 className="w-4 h-4 text-amber-600" />
-                  <span>Buyer Portal Preview</span>
+                  <ExternalLink className="w-4 h-4 text-amber-600" />
+                  <span>Buyer Portal</span>
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[10px] text-slate-400">Live</span>
               </Link>
             </div>
           </div>
@@ -136,19 +135,20 @@ export default function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) 
 
         {/* Footer info card */}
         <div className="p-3 border-t border-[#E2E8F0] bg-[#F8FAFC]">
-          <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] space-y-2">
+          <div className="px-3 py-2.5 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
-              <span className="text-[11px] font-bold text-[#163A5F]">
-                Sec 43B(h) Engine Active
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-semibold text-[#0F172A]">
+                Plugin Sync Active
               </span>
             </div>
-            <p className="text-[10px] text-[#64748B] leading-tight">
-              30% Tax deduction disallowance penalty calculation enforced for FY 2024-25.
-            </p>
+            <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              Connected
+            </span>
           </div>
         </div>
       </aside>
     </>
   );
 }
+

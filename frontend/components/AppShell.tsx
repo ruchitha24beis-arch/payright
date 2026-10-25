@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import AppSidebar from "./AppSidebar";
 import AppHeader from "./AppHeader";
+import { AuthProvider } from "@/context/AuthContext";
 
 function AppShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -78,13 +79,13 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
 
-        <footer className="border-t border-[#E2E8F0] bg-white py-4 px-6 text-center text-xs text-[#64748B]">
+        <footer className="border-t border-[#E2E8F0] bg-white py-3.5 px-6 text-xs text-[#64748B]">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p>
-              Chanakya MSME Commercial Preservation (LS-03) &bull; Built strictly on Section 43B(h), Section 16 MSMED Act, and RBI TReDS Framework
+            <p className="font-medium text-[#0F172A]">
+              Chanakya · Commercial Receivables &amp; Recovery Overlay
             </p>
             <p className="text-[11px] text-[#64748B]">
-              Non-Litigious Recovery Engine &bull; FY 2024-25 Active
+              Integrated with TallyPrime &amp; Zoho Books · FY 2024-25
             </p>
           </div>
         </footer>
@@ -96,7 +97,9 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC]" />}>
-      <AppShellContent>{children}</AppShellContent>
+      <AuthProvider>
+        <AppShellContent>{children}</AppShellContent>
+      </AuthProvider>
     </Suspense>
   );
 }

@@ -9,7 +9,8 @@ from app.config import settings
 from app.database import engine, Base, AsyncSessionLocal
 from app.models.company import Company
 from app.seed_data import seed_database
-from app.routers import invoices, settlements, guest_portal, treds, reminders, safeguards, analytics
+from app.tasks import process_deemed_acceptance_locks
+from app.routers import invoices, settlements, guest_portal, treds, financing, vendors, reminders, safeguards, analytics, sync, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,12 +25,18 @@ async def lifespan(app: FastAPI):
             print("Database empty. Seeding initial MSME and Corporate Buyer dataset...")
             await seed_database()
 
+    # Process 15-day deemed acceptance locks on startup
+    try:
+        await process_deemed_acceptance_locks()
+    except Exception as e:
+        print(f"Warning running deemed acceptance lock scan: {e}")
+
     yield
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
-    description="MSME Payment Recovery & Commercial Preservation Platform under Section 43B(h), TReDS, and Pro-Rata Milestones",
+    description="MSME Payment Recovery & Commercial Preservation Platform - Intelligent Overlay Plugin for TallyPrime and Zoho Books",
     lifespan=lifespan
 )
 
@@ -51,14 +58,20 @@ app.include_router(invoices.router, prefix=settings.API_V1_PREFIX)
 app.include_router(settlements.router, prefix=settings.API_V1_PREFIX)
 app.include_router(guest_portal.router, prefix=settings.API_V1_PREFIX)
 app.include_router(treds.router, prefix=settings.API_V1_PREFIX)
+app.include_router(financing.router, prefix=settings.API_V1_PREFIX)
+app.include_router(vendors.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reminders.router, prefix=settings.API_V1_PREFIX)
 app.include_router(safeguards.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
+app.include_router(sync.router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():
     return {
         "platform": settings.PROJECT_NAME,
+        "mode": "INTELLIGENT_OVERLAY_PLUGIN",
+        "supported_erps": ["TallyPrime ERP (XML Gateway)", "Zoho Books (OAuth Cloud REST)"],
         "status": "OPERATIONAL",
         "philosophy": "100% Commercial Relationship Preservation, Sec 43B(h) Tax Advisories, TReDS Factoring, EMI Milestones",
         "documentation": "/docs"
@@ -66,4 +79,4 @@ async def root():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "HEALTHY", "service": "MSME Commercial Recovery Engine"}
+    return {"status": "HEALTHY", "service": "MSME Commercial Recovery Engine", "plugin_overlay": True}
