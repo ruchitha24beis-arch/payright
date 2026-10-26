@@ -95,15 +95,28 @@ export default function DocumentHealthCheckPage() {
     fetchInvoices();
   }, [company?.id]);
 
-  async function fetchInvoices() {
+  async function fetchInvoices(targetInvoiceId?: number) {
     try {
       const vendorParam = company?.id ? `?vendor_id=${company.id}` : "";
       const res = await fetch(`${API_BASE_URL}/api/v1/invoices${vendorParam}`);
       if (res.ok) {
-        const data = await res.json();
+        const data: InvoiceItem[] = await res.json();
         setInvoices(data);
+        if (targetInvoiceId) {
+          const match = data.find(i => i.id === targetInvoiceId);
+          if (match) {
+            setSelectedInvoice(match);
+            return;
+          }
+        }
         if (data.length > 0) {
-          setSelectedInvoice(data[0]);
+          setSelectedInvoice((prev) => {
+            if (prev) {
+              const stillExists = data.find(i => i.id === prev.id);
+              if (stillExists) return stillExists;
+            }
+            return data[0];
+          });
         } else {
           setSelectedInvoice(null);
         }
@@ -114,6 +127,36 @@ export default function DocumentHealthCheckPage() {
       setLoading(false);
     }
   }
+
+  const handleInvoiceCreated = async (createdData?: any) => {
+    const targetId = createdData?.invoice_id || createdData?.id;
+    // Optimistically update invoice list in state immediately
+    if (createdData && (createdData.invoice_number || createdData.invoice_id)) {
+      const optimisticInvoice: InvoiceItem = {
+        id: targetId || Date.now(),
+        invoice_number: createdData.invoice_number || "INV-NEW",
+        vendor_name: company?.name || "Apex Precision",
+        buyer_name: "Corporate Buyer",
+        principal_amount: createdData.principal_amount || 0,
+        po_number: createdData.po_number || "",
+        goods_description: createdData.goods_description || "Commercial Supplies",
+        document_health_score: 0.0,
+        legal_health_score: 0.0,
+        ocr_details: createdData.ocr_details || {
+          document_health_score: 0.0,
+          health_grade: "NO_DOCUMENTS",
+          grade_label: "0% (No Document Uploaded)",
+          color: "slate",
+          checkpoints: [],
+          recommendation: "No Purchase Order (PO) or Proof of Delivery (POD) uploaded. Upload files to verify evidentiary health score."
+        }
+      };
+      setInvoices((prev) => [optimisticInvoice, ...prev.filter(i => i.id !== targetId)]);
+      setSelectedInvoice(optimisticInvoice);
+    }
+    // Immediately refetch from API and select new invoice
+    await fetchInvoices(targetId);
+  };
 
   const handleSimulateUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +182,7 @@ export default function DocumentHealthCheckPage() {
       if (res.ok) {
         const resJson = await res.json();
         setUploadMessage(resJson.message);
-        await fetchInvoices();
+        await fetchInvoices(resJson.invoice_id || resJson.id);
       }
     } catch (err) {
       console.error("Upload failed", err);
@@ -242,13 +285,15 @@ export default function DocumentHealthCheckPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#0F172A]">{inv.invoice_number}</span>
                       <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
-                        inv.document_health_score >= 85 
+                        (inv.document_health_score || 0) >= 85 
                           ? "bg-emerald-100 text-emerald-900"
-                          : inv.document_health_score >= 65
+                          : (inv.document_health_score || 0) >= 65
                           ? "bg-blue-100 text-blue-900"
-                          : "bg-amber-100 text-amber-900"
+                          : (inv.document_health_score || 0) > 0
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-slate-100 text-slate-700 border border-slate-200"
                       }`}>
-                        {inv.document_health_score}%
+                        {inv.document_health_score || 0}%
                       </span>
                     </div>
 
@@ -404,22 +449,28 @@ export default function DocumentHealthCheckPage() {
                       Evidentiary Health Score
                     </span>
                     <div className="text-2xl font-bold text-[#0F172A] mt-0.5 tabular-nums">
-                      {selectedInvoice.document_health_score}%
+                      {selectedInvoice.document_health_score || 0}%
                     </div>
                   </div>
 
                   <div className="text-right">
                     <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                      selectedInvoice.document_health_score >= 85
+                      (selectedInvoice.document_health_score || 0) >= 85
                         ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                        : selectedInvoice.document_health_score >= 65
+                        : (selectedInvoice.document_health_score || 0) >= 65
                         ? "bg-blue-50 text-blue-800 border border-blue-200"
-                        : "bg-amber-50 text-amber-800 border border-amber-200"
+                        : (selectedInvoice.document_health_score || 0) > 0
+                        ? "bg-amber-50 text-amber-800 border border-amber-200"
+                        : "bg-slate-100 text-slate-700 border border-slate-300"
                     }`}>
-                      {ocr?.grade_label || "Defense Ready"}
+                      {(!selectedInvoice.document_health_score || ocr?.health_grade === "NO_DOCUMENTS")
+                        ? "0% (No Document Uploaded)"
+                        : (ocr?.grade_label || "Defense Ready")}
                     </span>
                     <p className="text-[11px] text-[#64748B] mt-0.5">
-                      {ocr?.recommendation || "Full evidentiary backing."}
+                      {(!selectedInvoice.document_health_score || ocr?.health_grade === "NO_DOCUMENTS")
+                        ? "No Purchase Order (PO) or Proof of Delivery (POD) uploaded. Upload documents to scan evidentiary health."
+                        : (ocr?.recommendation || "Full evidentiary backing.")}
                     </p>
                   </div>
                 </div>
@@ -428,13 +479,15 @@ export default function DocumentHealthCheckPage() {
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-500 ${
-                      selectedInvoice.document_health_score >= 85
+                      (selectedInvoice.document_health_score || 0) >= 85
                         ? "bg-emerald-600"
-                        : selectedInvoice.document_health_score >= 65
+                        : (selectedInvoice.document_health_score || 0) >= 65
                         ? "bg-blue-600"
-                        : "bg-amber-600"
+                        : (selectedInvoice.document_health_score || 0) > 0
+                        ? "bg-amber-600"
+                        : "bg-slate-300"
                     }`}
-                    style={{ width: `${selectedInvoice.document_health_score}%` }}
+                    style={{ width: `${selectedInvoice.document_health_score || 0}%` }}
                   />
                 </div>
               </div>
@@ -454,6 +507,8 @@ export default function DocumentHealthCheckPage() {
                           ? "bg-emerald-50/30 border-emerald-200"
                           : cp.status === "WARNING"
                           ? "bg-blue-50/30 border-blue-200"
+                          : cp.score === 0
+                          ? "bg-slate-50 border-slate-200"
                           : "bg-amber-50/30 border-amber-200"
                       }`}
                     >
@@ -463,6 +518,8 @@ export default function DocumentHealthCheckPage() {
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           ) : cp.status === "WARNING" ? (
                             <AlertTriangle className="w-3.5 h-3.5 text-blue-600" />
+                          ) : cp.score === 0 ? (
+                            <XCircle className="w-3.5 h-3.5 text-slate-400" />
                           ) : (
                             <XCircle className="w-3.5 h-3.5 text-amber-600" />
                           )}
@@ -533,7 +590,7 @@ export default function DocumentHealthCheckPage() {
       <CreateInvoiceModal
         isOpen={createInvoiceOpen}
         onClose={() => setCreateInvoiceOpen(false)}
-        onCreated={fetchInvoices}
+        onCreated={handleInvoiceCreated}
       />
     </div>
   );

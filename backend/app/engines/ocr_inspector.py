@@ -28,8 +28,62 @@ class DocumentHealthInspector:
 
         # Extract text if available from files
         extracted_text = ""
-        has_po = po_file_path and os.path.exists(po_file_path)
-        has_pod = pod_file_path and os.path.exists(pod_file_path)
+        has_po = bool(po_file_path and os.path.exists(po_file_path))
+        has_pod = bool(pod_file_path and os.path.exists(pod_file_path))
+
+        # If no documents are attached, set health_score = 0, health_grade = NO_DOCUMENTS, all checkpoints to 0
+        if not has_po and not has_pod:
+            return {
+                "document_health_score": 0.0,
+                "health_grade": "NO_DOCUMENTS",
+                "grade_label": "0% (No Document Uploaded)",
+                "color": "slate",
+                "checkpoints": [
+                    {
+                        "name": "Buyer Official Stamp & Company Seal",
+                        "weight": 25,
+                        "status": "FLAGGED",
+                        "score": 0,
+                        "description": "Verification of buyer corporate rubber stamp or digital company seal",
+                        "remediation": "No document uploaded. Upload signed/stamped Proof of Delivery (POD) to scan buyer seal."
+                    },
+                    {
+                        "name": "Authorized Receiver Signature & Name",
+                        "weight": 25,
+                        "status": "FLAGGED",
+                        "score": 0,
+                        "description": "Readable employee signature confirming receipt of consignment",
+                        "remediation": "No document uploaded. Upload delivery proof with authorized receiver signature."
+                    },
+                    {
+                        "name": "Cross-Referenced PO & Invoice Numbers",
+                        "weight": 20,
+                        "status": "FLAGGED",
+                        "score": 0,
+                        "description": "Validation that POD explicitly references the authorizing Purchase Order",
+                        "remediation": "No document uploaded. Upload Purchase Order or reference-matched delivery challan."
+                    },
+                    {
+                        "name": "Inward Gate Entry & Date Stamp",
+                        "weight": 15,
+                        "status": "FLAGGED",
+                        "score": 0,
+                        "description": "Date of physical receipt, critical for 15/45-day statutory MSMED clock",
+                        "remediation": "No document uploaded. Upload security inward stamp or gate pass."
+                    },
+                    {
+                        "name": "Dispute-Free Goods Acceptance",
+                        "weight": 15,
+                        "status": "FLAGGED",
+                        "score": 0,
+                        "description": "Document shows clean receipt of materials without damage or shortage deductions",
+                        "remediation": "No document uploaded. Upload clean materials receipt note."
+                    }
+                ],
+                "po_file_attached": False,
+                "pod_file_attached": False,
+                "recommendation": "No Purchase Order (PO) or Proof of Delivery (POD) uploaded. Upload files to verify evidentiary health score."
+            }
 
         for path in [po_file_path, pod_file_path]:
             if path and os.path.exists(path):

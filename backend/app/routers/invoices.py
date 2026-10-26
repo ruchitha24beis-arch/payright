@@ -65,6 +65,16 @@ async def list_invoices(vendor_id: Optional[int] = None, db: AsyncSession = Depe
                 )
             await db.commit()
 
+        # Generate default empty OCR details if none recorded
+        ocr_info = inv.ocr_details
+        if not ocr_info:
+            ocr_info = DocumentHealthInspector.inspect_delivery_proof(
+                po_file_path=os.path.join(settings.UPLOAD_DIR, os.path.basename(inv.po_file_url)) if inv.po_file_url else None,
+                pod_file_path=os.path.join(settings.UPLOAD_DIR, os.path.basename(inv.pod_file_url)) if inv.pod_file_url else None,
+                expected_po_number=inv.po_number or "",
+                expected_invoice_number=inv.invoice_number
+            )
+
         inv_dict = {
             "id": inv.id,
             "invoice_number": inv.invoice_number,
@@ -76,9 +86,9 @@ async def list_invoices(vendor_id: Optional[int] = None, db: AsyncSession = Depe
             "due_date": inv.due_date,
             "delivery_date": inv.delivery_date,
             "status": inv.status.value if hasattr(inv.status, "value") else str(inv.status),
-            "document_health_score": inv.document_health_score,
-            "legal_health_score": inv.legal_health_score or inv.document_health_score,
-            "ocr_details": inv.ocr_details,
+            "document_health_score": inv.document_health_score if inv.document_health_score is not None else 0.0,
+            "legal_health_score": inv.legal_health_score if inv.legal_health_score is not None else (inv.document_health_score or 0.0),
+            "ocr_details": ocr_info,
             "po_file_url": inv.po_file_url,
             "pod_file_url": inv.pod_file_url,
             "po_number": inv.po_number,
@@ -134,6 +144,15 @@ async def get_invoice(invoice_id: int, db: AsyncSession = Depends(get_db)):
     delivery = inv.delivery_date or inv.invoice_date
     lock_info = InvoiceLockEngine.evaluate_acceptance_lock(delivery, inv.status.value, today)
     
+    ocr_info = inv.ocr_details
+    if not ocr_info:
+        ocr_info = DocumentHealthInspector.inspect_delivery_proof(
+            po_file_path=os.path.join(settings.UPLOAD_DIR, os.path.basename(inv.po_file_url)) if inv.po_file_url else None,
+            pod_file_path=os.path.join(settings.UPLOAD_DIR, os.path.basename(inv.pod_file_url)) if inv.pod_file_url else None,
+            expected_po_number=inv.po_number or "",
+            expected_invoice_number=inv.invoice_number
+        )
+
     return InvoiceRead(
         id=inv.id,
         invoice_number=inv.invoice_number,
@@ -145,9 +164,9 @@ async def get_invoice(invoice_id: int, db: AsyncSession = Depends(get_db)):
         due_date=inv.due_date,
         delivery_date=inv.delivery_date,
         status=inv.status.value if hasattr(inv.status, "value") else str(inv.status),
-        document_health_score=inv.document_health_score,
-        legal_health_score=inv.legal_health_score or inv.document_health_score,
-        ocr_details=inv.ocr_details,
+        document_health_score=inv.document_health_score if inv.document_health_score is not None else 0.0,
+        legal_health_score=inv.legal_health_score if inv.legal_health_score is not None else (inv.document_health_score or 0.0),
+        ocr_details=ocr_info,
         po_file_url=inv.po_file_url,
         pod_file_url=inv.pod_file_url,
         po_number=inv.po_number,
@@ -173,7 +192,7 @@ async def get_invoice(invoice_id: int, db: AsyncSession = Depends(get_db)):
         sec_43bh_eligible=advisory["vendor_eligible_43bh"]
     )
 
-@router.post("/create")
+@router.post("/create", status_code=201)
 async def create_invoice_json(
     payload: InvoiceCreate,
     db: AsyncSession = Depends(get_db)
@@ -191,7 +210,10 @@ async def create_invoice_json(
     deemed_clause, lock_deadline = InvoiceLockEngine.generate_contractual_clause(del_date)
     lock_info = InvoiceLockEngine.evaluate_acceptance_lock(del_date, "PENDING", date.today())
 
+    # For empty invoice creation without files, inspect_delivery_proof returns 0.0 and NO_DOCUMENTS
     ocr_result = DocumentHealthInspector.inspect_delivery_proof(
+        po_file_path=None,
+        pod_file_path=None,
         expected_po_number=payload.po_number or "",
         expected_invoice_number=payload.invoice_number
     )
@@ -209,6 +231,7 @@ async def create_invoice_json(
         return {
             "message": "Invoice updated successfully",
             "invoice_id": existing.id,
+            "id": existing.id,
             "invoice_number": existing.invoice_number,
             "portal_token": existing.portal_token
         }
@@ -223,8 +246,8 @@ async def create_invoice_json(
         delivery_date=del_date,
         po_number=payload.po_number,
         goods_description=payload.goods_description or "Commercial MSME Supplies",
-        document_health_score=ocr_result["document_health_score"],
-        legal_health_score=ocr_result["document_health_score"],
+        document_health_score=0.0,
+        legal_health_score=0.0,
         ocr_details=ocr_result,
         deemed_acceptance_date=lock_deadline,
         deemed_acceptance_clause=deemed_clause,
@@ -237,13 +260,16 @@ async def create_invoice_json(
     return {
         "message": "Real MSME invoice registered, 15-day Deemed Acceptance timer active",
         "invoice_id": new_invoice.id,
+        "id": new_invoice.id,
         "invoice_number": new_invoice.invoice_number,
-        "document_health_score": new_invoice.document_health_score,
+        "principal_amount": new_invoice.principal_amount,
+        "document_health_score": 0.0,
+        "legal_health_score": 0.0,
         "deemed_acceptance_date": lock_deadline.isoformat(),
         "portal_token": new_invoice.portal_token
     }
 
-@router.post("/upload")
+@router.post("/upload", status_code=201)
 async def upload_invoice_documents(
     invoice_number: str = Form(...),
     vendor_id: int = Form(...),
@@ -312,6 +338,7 @@ async def upload_invoice_documents(
         return {
             "message": "Invoice document health and 15-day deemed acceptance clock updated",
             "invoice_id": existing.id,
+            "id": existing.id,
             "invoice_number": existing.invoice_number,
             "document_health_score": existing.document_health_score,
             "legal_health_score": existing.legal_health_score,
@@ -347,6 +374,7 @@ async def upload_invoice_documents(
     return {
         "message": "Invoice registered, OCR scored, and 15-day Deemed Acceptance timer initialized",
         "invoice_id": new_invoice.id,
+        "id": new_invoice.id,
         "invoice_number": new_invoice.invoice_number,
         "document_health_score": new_invoice.document_health_score,
         "legal_health_score": new_invoice.legal_health_score,

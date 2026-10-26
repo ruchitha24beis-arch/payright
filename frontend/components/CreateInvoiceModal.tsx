@@ -31,7 +31,7 @@ interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  onCreated?: () => void;
+  onCreated?: (createdData?: any) => void;
   onOpenCreateBuyer?: () => void;
 }
 
@@ -130,6 +130,7 @@ export default function CreateInvoiceModal({
     try {
       const vendorId = company?.id || 1;
 
+      let createdData: any = null;
       if (poFile || podFile) {
         // Multipart Form Upload
         const formData = new FormData();
@@ -153,6 +154,7 @@ export default function CreateInvoiceModal({
         if (!res.ok) {
           throw new Error("Failed to upload invoice");
         }
+        createdData = await res.json();
       } else {
         // JSON Creation
         const res = await fetch(`${API_BASE_URL}/api/v1/invoices/create`, {
@@ -174,10 +176,18 @@ export default function CreateInvoiceModal({
         if (!res.ok) {
           throw new Error("Failed to create invoice");
         }
+        createdData = await res.json();
       }
 
       if (onSuccess) onSuccess();
-      if (onCreated) onCreated();
+      if (onCreated) onCreated(createdData);
+      
+      // Reset form fields
+      setInvoiceNumber("");
+      setPrincipalAmount("");
+      setPoNumber("");
+      setPoFile(null);
+      setPodFile(null);
       onClose();
     } catch (err: any) {
       console.error("Create invoice error:", err);
